@@ -19,6 +19,7 @@ type ApiResponse<T> = {
 type ApiSuccessOnly = {
     success: boolean;
     message: string;
+    data?: unknown;
 };
 
 type PostApiComment = {
@@ -131,6 +132,24 @@ async function requestWithAuth(
     return body;
 }
 
+async function resolveCurrentUser(
+    token: string | null,
+): Promise<AuthUser | null> {
+    let currentUser = await getAuthUser();
+
+    if (!currentUser && token) {
+        try {
+            const meResponse = await getMe();
+            currentUser = meResponse.data;
+            await saveAuthUser(currentUser);
+        } catch {
+            currentUser = null;
+        }
+    }
+
+    return currentUser;
+}
+
 function formatRelativeTime(dateIso: string) {
     const createdAt = new Date(dateIso).getTime();
     const now = Date.now();
@@ -196,17 +215,7 @@ function mapPost(post: PostApiPost, currentUser: AuthUser | null): FeedPost {
 
 export async function getFeedPosts(): Promise<FeedPost[]> {
     const token = await getAuthToken();
-    let currentUser = await getAuthUser();
-
-    if (!currentUser && token) {
-        try {
-            const meResponse = await getMe();
-            currentUser = meResponse.data;
-            await saveAuthUser(currentUser);
-        } catch {
-            currentUser = null;
-        }
-    }
+    const currentUser = await resolveCurrentUser(token);
 
     let response: Response;
     try {
@@ -252,4 +261,35 @@ export async function addCommentToPost(postId: string, comment: string) {
     await requestWithAuth(`/posts/${postId}/comment`, "POST", {
         comment,
     });
+}
+
+export async function createPost(content: string): Promise<FeedPost | null> {
+    const token = await getAuthToken();
+    const currentUser = await resolveCurrentUser(token);
+    const response = await requestWithAuth(`/posts/create`, "POST", {
+        content,
+    });
+
+    if (
+        response &&
+        "data" in response &&
+        response.data &&
+        typeof response.data === "object"
+    ) {
+        const maybePost = response.data as Partial<PostApiPost>;
+        if (
+            typeof maybePost.id === "number" &&
+            typeof maybePost.content === "string" &&
+            typeof maybePost.createdAt === "string" &&
+            typeof maybePost.name === "string" &&
+            typeof maybePost.email === "string" &&
+            typeof maybePost.likesCount === "number" &&
+            Array.isArray(maybePost.likes) &&
+            Array.isArray(maybePost.comments)
+        ) {
+            return mapPost(maybePost as PostApiPost, currentUser);
+        }
+    }
+
+    return null;
 }

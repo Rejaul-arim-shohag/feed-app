@@ -14,6 +14,7 @@ import { CreatePostSheet, FeedPost, PostCard } from "@/components/feed";
 import { ThemedText } from "@/components/themed-text";
 import {
     addCommentToPost,
+    createPost as createPostInApi,
     getFeedPosts,
     likePost,
     unlikePost,
@@ -162,10 +163,12 @@ export default function HomeScreen() {
         }
     };
 
-    const createPost = (text: string) => {
+    const createPost = async (text: string) => {
+        const temporaryPostId = `temp-post-${Date.now()}-${Math.random()}`;
+
         setPosts((previous) => [
             {
-                id: String(Date.now()),
+                id: temporaryPostId,
                 author: "You",
                 handle: "you",
                 createdAt: "now",
@@ -177,6 +180,28 @@ export default function HomeScreen() {
             ...previous,
         ]);
         setCreateSheetVisible(false);
+
+        try {
+            const createdPost = await createPostInApi(text);
+
+            if (createdPost) {
+                setPosts((previous) =>
+                    previous.map((post) =>
+                        post.id === temporaryPostId ? createdPost : post,
+                    ),
+                );
+            }
+        } catch (error) {
+            setPosts((previous) =>
+                previous.filter((post) => post.id !== temporaryPostId),
+            );
+
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to create post. Please try again.";
+            Alert.alert("Create post failed", message);
+        }
     };
 
     return (
