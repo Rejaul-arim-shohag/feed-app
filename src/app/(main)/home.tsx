@@ -1,58 +1,17 @@
-import { useState } from "react";
-import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+    ActivityIndicator,
+    FlatList,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CreatePostSheet, FeedPost, PostCard } from "@/components/feed";
 import { ThemedText } from "@/components/themed-text";
-
-const INITIAL_POSTS: FeedPost[] = [
-    {
-        id: "1",
-        author: "John Doe",
-        handle: "john",
-        createdAt: "2h",
-        text: "Good morning everyone. Just shipped the auth flow in my app. Next step is building a social feed UI.",
-        likes: 12,
-        reaction: null,
-        comments: [
-            { id: "1-1", author: "Sarah", text: "Nice progress!" },
-            { id: "1-2", author: "Rafi", text: "Keep going, looks clean." },
-        ],
-    },
-    {
-        id: "2",
-        author: "Techzu Team",
-        handle: "techzu",
-        createdAt: "5h",
-        text: "What feature should we build next after login and signup?",
-        likes: 8,
-        reaction: null,
-        comments: [],
-    },
-    {
-        id: "3",
-        author: "John Doe",
-        handle: "john",
-        createdAt: "2h",
-        text: "Good morning everyone. Just shipped the auth flow in my app. Next step is building a social feed UI.",
-        likes: 12,
-        reaction: null,
-        comments: [
-            { id: "1-1", author: "Sarah", text: "Nice progress!" },
-            { id: "1-2", author: "Rafi", text: "Keep going, looks clean." },
-        ],
-    },
-    {
-        id: "4",
-        author: "Techzu Team",
-        handle: "techzu",
-        createdAt: "5h",
-        text: "What feature should we build next after login and signup?",
-        likes: 8,
-        reaction: null,
-        comments: [],
-    },
-];
+import { getFeedPosts } from "@/services/posts/post-api";
 
 function applyLikeReaction(post: FeedPost) {
     if (post.reaction === "like") {
@@ -71,8 +30,38 @@ function applyLikeReaction(post: FeedPost) {
 }
 
 export default function HomeScreen() {
-    const [posts, setPosts] = useState(INITIAL_POSTS);
+    const [posts, setPosts] = useState<FeedPost[]>([]);
     const [isCreateSheetVisible, setCreateSheetVisible] = useState(false);
+    const [isLoading, setLoading] = useState(true);
+    const [isRefreshing, setRefreshing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    const loadFeed = useCallback(async (isManualRefresh = false) => {
+        if (isManualRefresh) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
+        }
+
+        try {
+            const fetchedPosts = await getFeedPosts();
+            setPosts(fetchedPosts);
+            setErrorMessage(null);
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to load posts.";
+            setErrorMessage(message);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadFeed();
+    }, [loadFeed]);
 
     const updateReaction = (postId: string) => {
         setPosts((previous) =>
@@ -148,7 +137,46 @@ export default function HomeScreen() {
             <FlatList
                 data={posts}
                 keyExtractor={(item) => item.id}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={() => loadFeed(true)}
+                    />
+                }
                 contentContainerStyle={styles.listContent}
+                ListEmptyComponent={
+                    isLoading ? (
+                        <View style={styles.stateContainer}>
+                            <ActivityIndicator size="small" color="#0E63D8" />
+                            <ThemedText style={styles.stateText}>
+                                Loading posts...
+                            </ThemedText>
+                        </View>
+                    ) : errorMessage ? (
+                        <View style={styles.stateContainer}>
+                            <ThemedText style={styles.errorText}>
+                                {errorMessage}
+                            </ThemedText>
+                            <Pressable
+                                onPress={() => loadFeed()}
+                                style={({ pressed }) => [
+                                    styles.retryButton,
+                                    pressed && styles.retryButtonPressed,
+                                ]}
+                            >
+                                <ThemedText style={styles.retryButtonText}>
+                                    Retry
+                                </ThemedText>
+                            </Pressable>
+                        </View>
+                    ) : (
+                        <View style={styles.stateContainer}>
+                            <ThemedText style={styles.stateText}>
+                                No posts yet.
+                            </ThemedText>
+                        </View>
+                    )
+                }
                 renderItem={({ item }) => (
                     <PostCard
                         post={item}
@@ -244,5 +272,39 @@ const styles = StyleSheet.create({
         paddingTop: 4,
         paddingBottom: 24,
         gap: 14,
+        flexGrow: 1,
+    },
+    stateContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 10,
+        paddingHorizontal: 24,
+    },
+    stateText: {
+        color: "#395678",
+        fontSize: 14,
+        fontWeight: 700,
+    },
+    errorText: {
+        color: "#A53232",
+        fontSize: 14,
+        textAlign: "center",
+        fontWeight: 700,
+    },
+    retryButton: {
+        minHeight: 42,
+        borderRadius: 12,
+        backgroundColor: "#0E63D8",
+        paddingHorizontal: 16,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    retryButtonPressed: {
+        opacity: 0.85,
+    },
+    retryButtonText: {
+        color: "#FFFFFF",
+        fontWeight: 800,
     },
 });
