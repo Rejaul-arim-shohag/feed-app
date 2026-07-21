@@ -8,8 +8,11 @@ import {
   AuthShell,
   AuthSwitchLink,
 } from "@/components/auth";
-import { signIn } from "@/services/auth/auth-api";
-import { saveAuthToken } from "@/services/auth/auth-token-storage";
+import { getMe, signIn } from "@/services/auth/auth-api";
+import {
+  saveAuthToken,
+  saveAuthUser,
+} from "@/services/auth/auth-token-storage";
 
 export default function LoginScreen() {
     const [email, setEmail] = useState("");
@@ -42,6 +45,8 @@ export default function LoginScreen() {
             });
 
             await saveAuthToken(response.data.token);
+            const meResponse = await getMe();
+            await saveAuthUser(meResponse.data);
 
             router.replace("/(main)/home");
         } catch (error) {

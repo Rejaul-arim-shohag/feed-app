@@ -8,10 +8,16 @@ import { ThemedText } from "@/components/themed-text";
 type PostCardProps = {
     post: FeedPost;
     onLike: (postId: string) => void;
+    isLikeUpdating?: boolean;
     onAddComment: (postId: string, text: string) => void;
 };
 
-export function PostCard({ post, onLike, onAddComment }: PostCardProps) {
+export function PostCard({
+    post,
+    onLike,
+    isLikeUpdating = false,
+    onAddComment,
+}: PostCardProps) {
     const [commentText, setCommentText] = useState("");
     const [showComments, setShowComments] = useState(false);
 
@@ -57,6 +63,7 @@ export function PostCard({ post, onLike, onAddComment }: PostCardProps) {
                     icon="♥"
                     count={post.likes}
                     active={post.reaction === "like"}
+                    disabled={isLikeUpdating}
                     onPress={() => onLike(post.id)}
                 />
                 <PostActionButton

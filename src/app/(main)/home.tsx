@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Alert,
     FlatList,
     Pressable,
     RefreshControl,
@@ -11,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CreatePostSheet, FeedPost, PostCard } from "@/components/feed";
 import { ThemedText } from "@/components/themed-text";
-import { getFeedPosts } from "@/services/posts/post-api";
+import { getFeedPosts, likePost, unlikePost } from "@/services/posts/post-api";
 
 function applyLikeReaction(post: FeedPost) {
     if (post.reaction === "like") {
@@ -35,6 +36,7 @@ export default function HomeScreen() {
     const [isLoading, setLoading] = useState(true);
     const [isRefreshing, setRefreshing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [pendingLikePostIds, setPendingLikePostIds] = useState<string[]>([]);
 
     const loadFeed = useCallback(async (isManualRefresh = false) => {
         if (isManualRefresh) {
@@ -63,12 +65,50 @@ export default function HomeScreen() {
         loadFeed();
     }, [loadFeed]);
 
-    const updateReaction = (postId: string) => {
+    const updateReaction = async (postId: string) => {
+        if (pendingLikePostIds.includes(postId)) {
+            return;
+        }
+
+        const targetPost = posts.find((post) => post.id === postId);
+        if (!targetPost) {
+            return;
+        }
+        console.log("___targetPost__", targetPost);
+
+        const wasLiked = targetPost.reaction === "like";
+        console.log("___wasLiked__", wasLiked);
+
         setPosts((previous) =>
             previous.map((post) =>
                 post.id === postId ? applyLikeReaction(post) : post,
             ),
         );
+        setPendingLikePostIds((previous) => [...previous, postId]);
+
+        try {
+            if (wasLiked) {
+                await unlikePost(postId);
+            } else {
+                await likePost(postId);
+            }
+        } catch (error) {
+            setPosts((previous) =>
+                previous.map((post) =>
+                    post.id === postId ? applyLikeReaction(post) : post,
+                ),
+            );
+
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to update like. Please try again.";
+            Alert.alert("Like update failed", message);
+        } finally {
+            setPendingLikePostIds((previous) =>
+                previous.filter((id) => id !== postId),
+            );
+        }
     };
 
     const addComment = (postId: string, text: string) => {
@@ -181,6 +221,7 @@ export default function HomeScreen() {
                     <PostCard
                         post={item}
                         onLike={updateReaction}
+                        isLikeUpdating={pendingLikePostIds.includes(item.id)}
                         onAddComment={addComment}
                     />
                 )}

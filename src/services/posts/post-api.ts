@@ -2,7 +2,13 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 import { FeedPost } from "@/components/feed";
-import { getAuthToken } from "@/services/auth/auth-token-storage";
+import { getMe } from "@/services/auth/auth-api";
+import {
+    AuthUser,
+    getAuthToken,
+    getAuthUser,
+    saveAuthUser,
+} from "@/services/auth/auth-token-storage";
 
 type ApiResponse<T> = {
     success: boolean;
@@ -10,10 +16,21 @@ type ApiResponse<T> = {
     data: T;
 };
 
+type ApiSuccessOnly = {
+    success: boolean;
+    message: string;
+};
+
 type PostApiComment = {
     id: number;
     comment: string;
     name: string;
+};
+
+type PostApiLike = {
+    id: number;
+    userId: number;
+    email: string;
 };
 
 type PostApiPost = {
@@ -23,6 +40,7 @@ type PostApiPost = {
     name: string;
     email: string;
     likesCount: number;
+    likes: PostApiLike[];
     comments: PostApiComment[];
 };
 
@@ -61,6 +79,55 @@ const POSTS_BASE_URL = normalizeBaseUrl(
     process.env.EXPO_PUBLIC_API_BASE_URL ?? getDefaultPostsBaseUrl(),
 );
 
+async function requestWithAuth(
+    path: string,
+    method: "GET" | "POST" | "DELETE",
+) {
+    const token = await getAuthToken();
+
+    let response: Response;
+    try {
+        response = await fetch(`${POSTS_BASE_URL}${path}`, {
+            method,
+            headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+    } catch {
+        throw new Error(
+            `Network error. Check API reachability: ${POSTS_BASE_URL}${path}`,
+        );
+    }
+
+    const rawBody = await response.text();
+    const hasJsonBody = rawBody.trim().length > 0;
+
+    let body: ApiSuccessOnly | { message?: string } | null = null;
+    if (hasJsonBody) {
+        try {
+            body = JSON.parse(rawBody) as ApiSuccessOnly | { message?: string };
+        } catch {
+            if (!response.ok) {
+                throw new Error("Invalid server response. Expected JSON.");
+            }
+        }
+    }
+
+    if (!response.ok) {
+        const message =
+            body && "message" in body && typeof body.message === "string"
+                ? body.message
+                : "Request failed.";
+        throw new Error(message);
+    }
+
+    if (body && "success" in body && body.success !== true) {
+        throw new Error(body.message || "Request failed.");
+    }
+
+    return body;
+}
+
 function formatRelativeTime(dateIso: string) {
     const createdAt = new Date(dateIso).getTime();
     const now = Date.now();
@@ -89,7 +156,25 @@ function toHandle(email: string) {
     return handle || "user";
 }
 
-function mapPost(post: PostApiPost): FeedPost {
+function isLikedByCurrentUser(post: PostApiPost, currentUser: AuthUser | null) {
+    if (!currentUser || typeof currentUser.id !== "number") {
+        return false;
+    }
+
+    return post.likes.some((like) => {
+        if (like.userId === currentUser.id) {
+            return true;
+        }
+
+        if (currentUser.email && like.email === currentUser.email) {
+            return true;
+        }
+
+        return false;
+    });
+}
+
+function mapPost(post: PostApiPost, currentUser: AuthUser | null): FeedPost {
     return {
         id: String(post.id),
         author: post.name,
@@ -97,7 +182,7 @@ function mapPost(post: PostApiPost): FeedPost {
         createdAt: formatRelativeTime(post.createdAt),
         text: post.content,
         likes: post.likesCount,
-        reaction: null,
+        reaction: isLikedByCurrentUser(post, currentUser) ? "like" : null,
         comments: post.comments.map((comment) => ({
             id: String(comment.id),
             author: comment.name,
@@ -108,6 +193,17 @@ function mapPost(post: PostApiPost): FeedPost {
 
 export async function getFeedPosts(): Promise<FeedPost[]> {
     const token = await getAuthToken();
+    let currentUser = await getAuthUser();
+
+    if (!currentUser && token) {
+        try {
+            const meResponse = await getMe();
+            currentUser = meResponse.data;
+            await saveAuthUser(currentUser);
+        } catch {
+            currentUser = null;
+        }
+    }
 
     let response: Response;
     try {
@@ -138,5 +234,13 @@ export async function getFeedPosts(): Promise<FeedPost[]> {
         throw new Error(message);
     }
 
-    return body.data.map(mapPost);
+    return body.data.map((post) => mapPost(post, currentUser));
+}
+
+export async function likePost(postId: string) {
+    await requestWithAuth(`/posts/${postId}/like`, "POST");
+}
+
+export async function unlikePost(postId: string) {
+    await requestWithAuth(`/posts/${postId}/unlike`, "DELETE");
 }

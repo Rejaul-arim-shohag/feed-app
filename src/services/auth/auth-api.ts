@@ -1,6 +1,8 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
+import { AuthUser, getAuthToken } from "@/services/auth/auth-token-storage";
+
 function normalizeBaseUrl(url: string) {
     return url.replace(/\/$/, "");
 }
@@ -60,6 +62,8 @@ export type SignInData = {
     token: string;
 };
 
+export type MeResponseData = AuthUser;
+
 async function postJson<T>(
     path: string,
     payload: unknown,
@@ -102,10 +106,54 @@ async function postJson<T>(
     return parsedBody;
 }
 
+async function getJson<T>(path: string): Promise<ApiResponse<T>> {
+    const token = await getAuthToken();
+
+    let response: Response;
+
+    try {
+        response = await fetch(`${AUTH_BASE_URL}${path}`, {
+            method: "GET",
+            headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+    } catch {
+        throw new Error(
+            `Network error. Check API reachability: ${AUTH_BASE_URL}`,
+        );
+    }
+
+    let parsedBody: ApiResponse<T> | { message?: string };
+    try {
+        parsedBody = await response.json();
+    } catch {
+        throw new Error("Invalid server response. Expected JSON.");
+    }
+
+    if (
+        !response.ok ||
+        !("success" in parsedBody) ||
+        parsedBody.success !== true
+    ) {
+        const message =
+            "message" in parsedBody && typeof parsedBody.message === "string"
+                ? parsedBody.message
+                : "Request failed. Please try again.";
+        throw new Error(message);
+    }
+
+    return parsedBody;
+}
+
 export async function signIn(payload: SignInPayload) {
     return postJson<SignInData>("/signin", payload);
 }
 
 export async function signUp(payload: SignUpPayload) {
     return postJson<SignInData>("/signup", payload);
+}
+
+export async function getMe() {
+    return getJson<MeResponseData>("/me");
 }

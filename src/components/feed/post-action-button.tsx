@@ -7,6 +7,7 @@ type PostActionButtonProps = {
     count: number;
     icon?: string;
     active?: boolean;
+    disabled?: boolean;
     onPress: () => void;
 };
 
@@ -15,15 +16,18 @@ export function PostActionButton({
     count,
     icon,
     active = false,
+    disabled = false,
     onPress,
 }: PostActionButtonProps) {
     return (
         <Pressable
             onPress={onPress}
+            disabled={disabled}
             style={({ pressed }) => [
                 styles.button,
                 active && styles.buttonActive,
                 pressed && styles.buttonPressed,
+                disabled && styles.buttonDisabled,
             ]}
         >
             <View style={styles.content}>
@@ -66,6 +70,9 @@ const styles = StyleSheet.create({
     },
     buttonPressed: {
         opacity: 0.85,
+    },
+    buttonDisabled: {
+        opacity: 0.6,
     },
     content: {
         flexDirection: "row",
