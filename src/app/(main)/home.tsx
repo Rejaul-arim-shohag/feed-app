@@ -12,7 +12,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CreatePostSheet, FeedPost, PostCard } from "@/components/feed";
 import { ThemedText } from "@/components/themed-text";
-import { getFeedPosts, likePost, unlikePost } from "@/services/posts/post-api";
+import {
+    addCommentToPost,
+    getFeedPosts,
+    likePost,
+    unlikePost,
+} from "@/services/posts/post-api";
 
 function applyLikeReaction(post: FeedPost) {
     if (post.reaction === "like") {
@@ -74,10 +79,7 @@ export default function HomeScreen() {
         if (!targetPost) {
             return;
         }
-        console.log("___targetPost__", targetPost);
-
         const wasLiked = targetPost.reaction === "like";
-        console.log("___wasLiked__", wasLiked);
 
         setPosts((previous) =>
             previous.map((post) =>
@@ -111,7 +113,9 @@ export default function HomeScreen() {
         }
     };
 
-    const addComment = (postId: string, text: string) => {
+    const addComment = async (postId: string, text: string) => {
+        const temporaryCommentId = `temp-${Date.now()}-${Math.random()}`;
+
         setPosts((previous) =>
             previous.map((post) => {
                 if (post.id !== postId) {
@@ -123,7 +127,7 @@ export default function HomeScreen() {
                     comments: [
                         ...post.comments,
                         {
-                            id: `${post.id}-${post.comments.length + 1}`,
+                            id: temporaryCommentId,
                             author: "You",
                             text,
                         },
@@ -131,6 +135,31 @@ export default function HomeScreen() {
                 };
             }),
         );
+
+        try {
+            await addCommentToPost(postId, text);
+        } catch (error) {
+            setPosts((previous) =>
+                previous.map((post) => {
+                    if (post.id !== postId) {
+                        return post;
+                    }
+
+                    return {
+                        ...post,
+                        comments: post.comments.filter(
+                            (comment) => comment.id !== temporaryCommentId,
+                        ),
+                    };
+                }),
+            );
+
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to add comment. Please try again.";
+            Alert.alert("Comment failed", message);
+        }
     };
 
     const createPost = (text: string) => {

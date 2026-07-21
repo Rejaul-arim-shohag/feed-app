@@ -82,6 +82,7 @@ const POSTS_BASE_URL = normalizeBaseUrl(
 async function requestWithAuth(
     path: string,
     method: "GET" | "POST" | "DELETE",
+    payload?: unknown,
 ) {
     const token = await getAuthToken();
 
@@ -90,8 +91,10 @@ async function requestWithAuth(
         response = await fetch(`${POSTS_BASE_URL}${path}`, {
             method,
             headers: {
+                ...(payload ? { "Content-Type": "application/json" } : {}),
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
+            ...(payload ? { body: JSON.stringify(payload) } : {}),
         });
     } catch {
         throw new Error(
@@ -243,4 +246,10 @@ export async function likePost(postId: string) {
 
 export async function unlikePost(postId: string) {
     await requestWithAuth(`/posts/${postId}/unlike`, "DELETE");
+}
+
+export async function addCommentToPost(postId: string, comment: string) {
+    await requestWithAuth(`/posts/${postId}/comment`, "POST", {
+        comment,
+    });
 }
