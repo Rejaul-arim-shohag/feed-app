@@ -8,23 +8,26 @@ import {
     AuthShell,
     AuthSwitchLink,
 } from "@/components/auth";
+import { signUp } from "@/services/auth/auth-api";
 
 export default function SignupScreen() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const canSubmit = useMemo(() => {
         return (
             name.trim().length >= 2 &&
             email.trim().length > 4 &&
             password.trim().length >= 6 &&
-            confirmPassword.trim().length >= 6
+            confirmPassword.trim().length >= 6 &&
+            !isSubmitting
         );
-    }, [name, email, password, confirmPassword]);
+    }, [name, email, password, confirmPassword, isSubmitting]);
 
-    const onSignup = () => {
+    const onSignup = async () => {
         if (!canSubmit) {
             Alert.alert(
                 "Incomplete form",
@@ -41,7 +44,26 @@ export default function SignupScreen() {
             return;
         }
 
-        router.replace("/(main)/home");
+        try {
+            setIsSubmitting(true);
+
+            const response = await signUp({
+                name: name.trim(),
+                email: email.trim(),
+                password,
+            });
+
+            Alert.alert("Sign up successful", response.message);
+            router.replace("/");
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to create account. Please try again.";
+            Alert.alert("Sign up failed", message);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -93,7 +115,7 @@ export default function SignupScreen() {
             />
 
             <AuthButton
-                label="Create account"
+                label={isSubmitting ? "Creating account..." : "Create account"}
                 onPress={onSignup}
                 disabled={!canSubmit}
             />

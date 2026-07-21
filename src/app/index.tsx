@@ -3,22 +3,28 @@ import { useMemo, useState } from "react";
 import { Alert } from "react-native";
 
 import {
-    AuthButton,
-    AuthInput,
-    AuthShell,
-    AuthSwitchLink,
+  AuthButton,
+  AuthInput,
+  AuthShell,
+  AuthSwitchLink,
 } from "@/components/auth";
+import { signIn } from "@/services/auth/auth-api";
+import { saveAuthToken } from "@/services/auth/auth-token-storage";
 
 export default function LoginScreen() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const canSubmit = useMemo(
-        () => email.trim().length > 4 && password.trim().length >= 6,
-        [email, password],
+        () =>
+            email.trim().length > 4 &&
+            password.trim().length >= 6 &&
+            !isSubmitting,
+        [email, password, isSubmitting],
     );
 
-    const onLogin = () => {
+    const onLogin = async () => {
         if (!canSubmit) {
             Alert.alert(
                 "Missing details",
@@ -27,7 +33,26 @@ export default function LoginScreen() {
             return;
         }
 
-        router.replace("/(main)/home");
+        try {
+            setIsSubmitting(true);
+
+            const response = await signIn({
+                email: email.trim(),
+                password,
+            });
+
+            await saveAuthToken(response.data.token);
+
+            router.replace("/(main)/home");
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to sign in. Please try again.";
+            Alert.alert("Sign in failed", message);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -62,7 +87,7 @@ export default function LoginScreen() {
             />
 
             <AuthButton
-                label="Sign in"
+                label={isSubmitting ? "Signing in..." : "Sign in"}
                 onPress={onLogin}
                 disabled={!canSubmit}
             />
