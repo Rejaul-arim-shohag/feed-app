@@ -1,6 +1,6 @@
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
-import { Alert } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, View } from "react-native";
 
 import {
   AuthButton,
@@ -10,6 +10,8 @@ import {
 } from "@/components/auth";
 import { getMe, signIn } from "@/services/auth/auth-api";
 import {
+  getAuthToken,
+  getAuthUser,
   saveAuthToken,
   saveAuthUser,
 } from "@/services/auth/auth-token-storage";
@@ -18,14 +20,56 @@ export default function LoginScreen() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isCheckingSession, setCheckingSession] = useState(true);
+
+    useEffect(() => {
+        const checkSession = async () => {
+            try {
+                const token = await getAuthToken();
+                if (!token) {
+                    return;
+                }
+
+                const existingUser = await getAuthUser();
+                if (!existingUser) {
+                    const meResponse = await getMe();
+                    await saveAuthUser(meResponse.data);
+                }
+
+                router.replace("/(main)/home");
+            } catch {
+                // If session validation fails, keep user on login.
+            } finally {
+                setCheckingSession(false);
+            }
+        };
+
+        checkSession();
+    }, []);
 
     const canSubmit = useMemo(
         () =>
             email.trim().length > 4 &&
             password.trim().length >= 6 &&
-            !isSubmitting,
-        [email, password, isSubmitting],
+            !isSubmitting &&
+            !isCheckingSession,
+        [email, password, isSubmitting, isCheckingSession],
     );
+
+    if (isCheckingSession) {
+        return (
+            <View
+                style={{
+                    flex: 1,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    backgroundColor: "#0B1B2B",
+                }}
+            >
+                <ActivityIndicator size="small" color="#8FD9FF" />
+            </View>
+        );
+    }
 
     const onLogin = async () => {
         if (!canSubmit) {
