@@ -1,29 +1,168 @@
-import { router } from "expo-router";
-import { Pressable, SafeAreaView, StyleSheet, View } from "react-native";
+import { useState } from "react";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import { CreatePostSheet, FeedPost, PostCard } from "@/components/feed";
 import { ThemedText } from "@/components/themed-text";
 
-export default function HomeScreen() {
-    return (
-        <SafeAreaView style={styles.safeArea}>
-            <View style={styles.container}>
-                <ThemedText style={styles.eyebrow}>Dashboard</ThemedText>
-                <ThemedText style={styles.title}>Welcome back</ThemedText>
-                <ThemedText style={styles.subtitle}>
-                    This is your signed-in area. Start replacing this screen
-                    with your app content.
-                </ThemedText>
+const INITIAL_POSTS: FeedPost[] = [
+    {
+        id: "1",
+        author: "John Doe",
+        handle: "john",
+        createdAt: "2h",
+        text: "Good morning everyone. Just shipped the auth flow in my app. Next step is building a social feed UI.",
+        likes: 12,
+        reaction: null,
+        comments: [
+            { id: "1-1", author: "Sarah", text: "Nice progress!" },
+            { id: "1-2", author: "Rafi", text: "Keep going, looks clean." },
+        ],
+    },
+    {
+        id: "2",
+        author: "Techzu Team",
+        handle: "techzu",
+        createdAt: "5h",
+        text: "What feature should we build next after login and signup?",
+        likes: 8,
+        reaction: null,
+        comments: [],
+    },
+    {
+        id: "3",
+        author: "John Doe",
+        handle: "john",
+        createdAt: "2h",
+        text: "Good morning everyone. Just shipped the auth flow in my app. Next step is building a social feed UI.",
+        likes: 12,
+        reaction: null,
+        comments: [
+            { id: "1-1", author: "Sarah", text: "Nice progress!" },
+            { id: "1-2", author: "Rafi", text: "Keep going, looks clean." },
+        ],
+    },
+    {
+        id: "4",
+        author: "Techzu Team",
+        handle: "techzu",
+        createdAt: "5h",
+        text: "What feature should we build next after login and signup?",
+        likes: 8,
+        reaction: null,
+        comments: [],
+    },
+];
 
+function applyLikeReaction(post: FeedPost) {
+    if (post.reaction === "like") {
+        return {
+            ...post,
+            likes: Math.max(0, post.likes - 1),
+            reaction: null,
+        };
+    }
+
+    return {
+        ...post,
+        likes: post.likes + 1,
+        reaction: "like" as const,
+    };
+}
+
+export default function HomeScreen() {
+    const [posts, setPosts] = useState(INITIAL_POSTS);
+    const [isCreateSheetVisible, setCreateSheetVisible] = useState(false);
+
+    const updateReaction = (postId: string) => {
+        setPosts((previous) =>
+            previous.map((post) =>
+                post.id === postId ? applyLikeReaction(post) : post,
+            ),
+        );
+    };
+
+    const addComment = (postId: string, text: string) => {
+        setPosts((previous) =>
+            previous.map((post) => {
+                if (post.id !== postId) {
+                    return post;
+                }
+
+                return {
+                    ...post,
+                    comments: [
+                        ...post.comments,
+                        {
+                            id: `${post.id}-${post.comments.length + 1}`,
+                            author: "You",
+                            text,
+                        },
+                    ],
+                };
+            }),
+        );
+    };
+
+    const createPost = (text: string) => {
+        setPosts((previous) => [
+            {
+                id: String(Date.now()),
+                author: "You",
+                handle: "you",
+                createdAt: "now",
+                text,
+                likes: 0,
+                reaction: null,
+                comments: [],
+            },
+            ...previous,
+        ]);
+        setCreateSheetVisible(false);
+    };
+
+    return (
+        <SafeAreaView style={styles.safeArea} edges={["top"]}>
+            <View pointerEvents="none" style={styles.backgroundLayer}>
+                <View style={styles.blobTop} />
+                <View style={styles.blobBottom} />
+            </View>
+
+            <View style={styles.header}>
                 <Pressable
-                    onPress={() => router.replace("/")}
+                    onPress={() => setCreateSheetVisible(true)}
                     style={({ pressed }) => [
-                        styles.button,
-                        pressed && styles.buttonPressed,
+                        styles.createButtonTop,
+                        pressed && styles.createButtonTopPressed,
                     ]}
                 >
-                    <ThemedText style={styles.buttonText}>Sign out</ThemedText>
+                    <ThemedText style={styles.createButtonTopIcon}>
+                        +
+                    </ThemedText>
+                    <ThemedText style={styles.createButtonTopText}>
+                        Create Post
+                    </ThemedText>
                 </Pressable>
             </View>
+
+            <FlatList
+                data={posts}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.listContent}
+                renderItem={({ item }) => (
+                    <PostCard
+                        post={item}
+                        onLike={updateReaction}
+                        onAddComment={addComment}
+                    />
+                )}
+            />
+
+            <CreatePostSheet
+                visible={isCreateSheetVisible}
+                onClose={() => setCreateSheetVisible(false)}
+                onSubmit={createPost}
+            />
         </SafeAreaView>
     );
 }
@@ -31,46 +170,79 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#F6F8FC",
+        backgroundColor: "#EAF2FF",
     },
-    container: {
-        flex: 1,
-        justifyContent: "center",
-        paddingHorizontal: 24,
-        gap: 12,
+    backgroundLayer: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
     },
-    eyebrow: {
-        fontSize: 13,
-        fontWeight: 700,
-        textTransform: "uppercase",
-        letterSpacing: 1.8,
-        color: "#4A6180",
+    blobTop: {
+        position: "absolute",
+        top: -120,
+        right: -90,
+        width: 280,
+        height: 280,
+        borderRadius: 999,
+        backgroundColor: "#93C5FD",
+        opacity: 0.35,
     },
-    title: {
-        fontSize: 36,
-        lineHeight: 42,
-        fontWeight: 700,
-        color: "#0D1D2E",
+    blobBottom: {
+        position: "absolute",
+        bottom: -160,
+        left: -120,
+        width: 340,
+        height: 340,
+        borderRadius: 999,
+        backgroundColor: "#FCA5A5",
+        opacity: 0.22,
     },
-    subtitle: {
-        fontSize: 16,
-        lineHeight: 24,
-        color: "#4A6180",
-        marginBottom: 10,
+    header: {
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        paddingBottom: 12,
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        alignItems: "center",
     },
-    button: {
-        alignSelf: "flex-start",
-        backgroundColor: "#0D6EFD",
+    createButtonTop: {
         borderRadius: 14,
-        paddingHorizontal: 18,
-        minHeight: 48,
+        backgroundColor: "#0E63D8",
+        borderWidth: 1,
+        borderColor: "#3E88EC",
+        paddingHorizontal: 16,
+        minHeight: 46,
         justifyContent: "center",
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 8,
+        shadowColor: "#0D1D2E",
+        shadowOpacity: 0.2,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 5,
     },
-    buttonPressed: {
+    createButtonTopPressed: {
         opacity: 0.9,
     },
-    buttonText: {
+    createButtonTopIcon: {
         color: "#FFFFFF",
-        fontWeight: 700,
+        fontSize: 20,
+        lineHeight: 20,
+        fontWeight: 800,
+        marginTop: -2,
+    },
+    createButtonTopText: {
+        color: "#FFFFFF",
+        fontSize: 14,
+        fontWeight: 800,
+    },
+    listContent: {
+        paddingHorizontal: 16,
+        paddingTop: 4,
+        paddingBottom: 24,
+        gap: 14,
     },
 });
