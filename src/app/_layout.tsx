@@ -3,8 +3,10 @@ import * as SplashScreen from "expo-splash-screen";
 import { useColorScheme } from "react-native";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import { configurePushForegroundBehavior } from "@/services/notification/push-registration";
 
 SplashScreen.preventAutoHideAsync();
+configurePushForegroundBehavior();
 
 export default function RootLayout() {
     const colorScheme = useColorScheme();
