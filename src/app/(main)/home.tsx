@@ -7,7 +7,6 @@ import {
     Pressable,
     RefreshControl,
     StyleSheet,
-    Text,
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -74,21 +73,21 @@ export default function HomeScreen() {
         loadFeed();
     }, [loadFeed]);
 
-    // useEffect(() => {
-    //     if (!expoPushToken) {
-    //         return;
-    //     }
+    useEffect(() => {
+        if (!expoPushToken) {
+            return;
+        }
 
-    //     console.log("Expo Push Token:", expoPushToken);
-    // }, [expoPushToken]);
+        console.log("Expo Push Token:", expoPushToken);
+    }, [expoPushToken]);
 
-    // useEffect(() => {
-    //     if (!notification) {
-    //         return;
-    //     }
+    useEffect(() => {
+        if (!notification) {
+            return;
+        }
 
-    //     console.log("Notification:", notification);
-    // }, [notification]);
+        console.log("Notification:", notification);
+    }, [notification]);
 
     const updateReaction = async (postId: string) => {
         if (pendingLikePostIds.includes(postId)) {
@@ -229,13 +228,6 @@ export default function HomeScreen() {
                 <View style={styles.blobTop} />
                 <View style={styles.blobBottom} />
             </View>
-
-            <Text>{expoPushToken}</Text>
-            <Text>
-                {notification
-                    ? JSON.stringify(notification)
-                    : "No notification"}
-            </Text>
             <View style={styles.header}>
                 <Pressable
                     onPress={() => setCreateSheetVisible(true)}

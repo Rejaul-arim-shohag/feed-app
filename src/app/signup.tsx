@@ -1,7 +1,3 @@
-import { router } from "expo-router";
-import { useMemo, useState } from "react";
-import { Alert } from "react-native";
-
 import {
     AuthButton,
     AuthInput,
@@ -9,6 +5,9 @@ import {
     AuthSwitchLink,
 } from "@/components/auth";
 import { signUp } from "@/services/auth/auth-api";
+import { router } from "expo-router";
+import { useMemo, useState } from "react";
+import { Alert } from "react-native";
 
 export default function SignupScreen() {
     const [name, setName] = useState("");
