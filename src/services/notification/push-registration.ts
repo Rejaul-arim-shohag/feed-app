@@ -42,7 +42,7 @@ const API_BASE_URL = normalizeBaseUrl(
 );
 
 const REGISTER_PUSH_TOKEN_PATH =
-    process.env.EXPO_PUBLIC_PUSH_TOKEN_PATH ?? "/notifications/register-token";
+    process.env.EXPO_PUBLIC_PUSH_TOKEN_PATH ?? "/device-tokens/save-token";
 
 let lastRegisteredToken: string | null = null;
 
@@ -73,7 +73,7 @@ async function ensureAndroidNotificationChannel(
     });
 }
 
-async function fetchExpoPushToken(Notifications: NotificationsModule) {
+async function fetchDevicePushToken(Notifications: NotificationsModule) {
     if (!Device.isDevice) {
         return null;
     }
@@ -92,20 +92,7 @@ async function fetchExpoPushToken(Notifications: NotificationsModule) {
         return null;
     }
 
-    const projectId =
-        process.env.EXPO_PUBLIC_EAS_PROJECT_ID ??
-        Constants.expoConfig?.extra?.eas?.projectId ??
-        Constants.easConfig?.projectId;
-
-    if (!projectId) {
-        throw new Error(
-            "Missing EAS projectId. Set expo.extra.eas.projectId in app.json.",
-        );
-    }
-
-    const tokenResult = await Notifications.getExpoPushTokenAsync({
-        projectId,
-    });
+    const tokenResult = await Notifications.getDevicePushTokenAsync();
 
     return tokenResult.data;
 }
@@ -116,6 +103,16 @@ async function sendPushTokenToServer(pushToken: string) {
         return;
     }
 
+    const deviceName =
+        Device.deviceName ??
+        Device.modelName ??
+        Device.modelId ??
+        Platform.select({
+            ios: "iOS Device",
+            android: "Android Device",
+            default: "Unknown Device",
+        });
+
     const response = await fetch(`${API_BASE_URL}${REGISTER_PUSH_TOKEN_PATH}`, {
         method: "POST",
         headers: {
@@ -123,8 +120,8 @@ async function sendPushTokenToServer(pushToken: string) {
             Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
-            token: pushToken,
-            platform: Platform.OS,
+            fcmToken: pushToken,
+            deviceName,
         }),
     });
 
@@ -156,7 +153,7 @@ export async function registerDeviceForPushNotifications() {
             return null;
         }
 
-        const pushToken = await fetchExpoPushToken(Notifications);
+        const pushToken = await fetchDevicePushToken(Notifications);
         if (!pushToken) {
             return null;
         }
