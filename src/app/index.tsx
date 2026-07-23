@@ -15,7 +15,7 @@ import {
   saveAuthToken,
   saveAuthUser,
 } from "@/services/auth/auth-token-storage";
-import { registerDeviceForPushNotifications } from "@/services/notification/push-registration";
+// import { registerDeviceForPushNotifications } from "@/services/notification/push-registration";
 
 export default function LoginScreen() {
     const [email, setEmail] = useState("");
@@ -37,7 +37,7 @@ export default function LoginScreen() {
                     await saveAuthUser(meResponse.data);
                 }
 
-                await registerDeviceForPushNotifications();
+                // await registerDeviceForPushNotifications();
 
                 router.replace("/(main)/home");
             } catch {
@@ -94,7 +94,7 @@ export default function LoginScreen() {
             await saveAuthToken(response.data.token);
             const meResponse = await getMe();
             await saveAuthUser(meResponse.data);
-            await registerDeviceForPushNotifications();
+            // await registerDeviceForPushNotifications();
 
             router.replace("/(main)/home");
         } catch (error) {
